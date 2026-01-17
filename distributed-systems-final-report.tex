@@ -4,585 +4,188 @@
 \usepackage{url}
 \usepackage{natbib}
 \usepackage{graphicx}
-\usepackage{cleveref} % this must be the last package to be loaded
+\usepackage{cleveref}
 
 \newcommand{\emailaddr}[1]{\href{mailto:#1}{\texttt{#1}}}
 
 \title{\LARGE
-    Final Report Template\\
-    (replace with your project name)
+    Mini-Dynamo: A Distributed Key--Value Store in Python
 }
-\subtitle{Final Report for the Distributed Systems Course [Your academic year here]}
+\subtitle{Final Report for the Distributed Systems Course 2025/2026}
 
-% Consider watching:
-% https://www.youtube.com/watch?v=ihxSUsJB_14
-% https://www.youtube.com/watch?v=XTFWaV55uDo
+\author{Dominykas Arnauskas\\\emailaddr{dominykas.arnauskas@studio.unibo.it]}}
 
-\author{
-    Author 1 \\ \emailaddr{author1@email.it}
-    \and
-    Author 2 \\ \emailaddr{author2@gmail.com}
-    \and
-    Author 3 \\ \emailaddr{author3@unibo.it}
-}
-
-\date{\today}
+\date{}
 
 \begin{document}
-
 \maketitle
-
-\begin{abstract}
-    Up to $\sim$2000 characters briefly describing the project.
-\end{abstract}
-
-\section*{Disclaimer (if needed)}
-
-During the preparation of this work, the author(s) used [NAME TOOL / SERVICE] to [REASON].
-
-After using this tool/service, 
-the author(s) reviewed and edited the content as needed 
-and take(s) full responsibility for the content of the final report/artifact.
-
-\section*{Quick \LaTeX{} suggestions}
-
-If you need to cite a reference, you can use the \texttt{cite} command, 
-like providing the BibTex key of some entry in the \texttt{references.bib} file, 
-e.g.: \cite{adams1995hitchhiker}.
-
-You can find pre-coocked BibTex entries for most Computer Science papers on \href{https://dblp.uni-trier.de/}{DBLP}.
-
-If you need to include an image,
-let \LaTeX{} decide where to put it by using the \texttt{figure} environment,
-with a \texttt{includegraphics} command inside it.
-%
-If your need to reference a figure,
-use the \texttt{label} command to assign a label to the figure,
-and then use the \texttt{cref} command to reference it.
-%
-Put figures in the \texttt{figures} folder.
-%
-A complete example is shown in \cref{fig:universe}.
-
-\begin{figure}
-    \centering
-    \includegraphics[width=0.5\textwidth]{figures/universe.jpg}
-    \caption{This is an example image}
-    \label{fig:universe}
-\end{figure}
-
-Do \textbf{not} put any placement constraint on figures,
-such as \texttt{[h]} or \texttt{[h!]}.
-%
-Same considerations apply for other floating elements 
-(e.g. tables, algorithms, listings, etc.).
-
-Do \textbf{not} use the \texttt{\textbackslash\textbackslash} or \texttt{\textbackslash newline} commands to break lines.
-
-Just leave an empty line between two paragraphs to start a new one.
-%
-The new line will be automatically indented.
-%
-This is intended: it is the \LaTeX{} way to separate capoverses.
 
 \section{Concept}\label{concept}
 
-Here you should explain:
+This project delivers a \textbf{distributed key--value store} (a software service) and supporting tooling for demonstration and evaluation.
 
 \begin{itemize}
-  \item The type of product developed with that project, for example (non-exhaustive):
-  %
-  \begin{itemize}
-    \item Application (with GUI, be it mobile, web, or desktop)
-    \item Command-line application (CLI could be used by humans or scripts)
-    \item Library
-    \item Web-service(s)
-  \end{itemize}
-
-  \item Use case description:
-  %
-  \begin{itemize}
-    \item \emph{what} is the software doing?
-    \item \emph{where} are the users?
-    \item \emph{when} and \emph{how frequently} do they interact with the system?
-    \item \emph{how} do they \emph{interact} with the system? which \emph{devices} are they using?
-    \item does the system need to \emph{store} user's \textbf{data}? \emph{which}? \emph{where}?
-    \item most likely, there will be \emph{multiple} \textbf{roles}
-  \end{itemize}
-
-  \item Why is distribution needed?
-  %
-  \begin{itemize}
-    \item geographically distributed environments?
-    \item computation speedup?
-    \item resource sharing?
-    \item fault tolerance?
-    \item other reasons?
-  \end{itemize}
-  %
-  In any case, please elaborate.
+  \item \textbf{Product type:} a multi-node distributed storage service (application) plus a simple demo UI.
+  \item \textbf{System goal:} accept client requests on any node and store/retrieve data reliably even when nodes fail.
+  \item \textbf{Main functionalities:}
+    \begin{itemize}
+      \item \texttt{PUT(key, value)}: store/update a value for a key.
+      \item \texttt{GET(key)}: retrieve the latest value for a key.
+      \item \texttt{DELETE(key)}: delete a key using a tombstone record.
+      \item Partitioning via consistent hashing (with virtual nodes).
+      \item Replication to $R$ distinct nodes.
+      \item Quorum reads/writes via parameters $W$ and $Q$.
+      \item Membership and failure detection via heartbeats.
+      \item Rebalancing (key handoff) on membership changes.
+      \item Web UI for demo and observability (human-readable summaries + raw JSON).
+    \end{itemize}
 \end{itemize}
 
 \section{Requirements Elicitation and Analysis}\label{requirements}
 
+\textbf{Functional requirements}
 \begin{itemize}
-  \item The requirements must explain \textbf{what} (not how) the software
-  being produced should do.
-  %
-  \begin{itemize}
-    \item you should not focus on the particular problems, but exclusively on
-    what you want the application to do.
-  \end{itemize}
+  \item Provide a client API for \texttt{PUT/GET/DELETE}.
+  \item Allow clients to contact any node (coordinator-style handling).
+  \item Partition keys across nodes using consistent hashing.
+  \item Replicate records to multiple nodes and support quorum-based reads/writes.
+  \item Detect failed peers and adapt routing to any available nodes.
+  \item Support changes when new node joins or leaves without requiring a full restart.
+  \item Provide a simple user interface for demonstration.
+\end{itemize}
 
-  \item Requirements must be clearly identified, and possibly numbered
-
-  \item Requirements are divided into:
-  %
-  \begin{itemize}
-    \item \textbf{Functional}: some functionality the software should provide to the user
-
-    \item \textbf{Non-functional}: requirements that do not directly concern behavioural aspects, such as consistency, availability, etc.
-
-    \item \textbf{Implementation}: constrain the entire phase of system realization, 
-    for instance by requiring the use of a specific programming language and/or a specific software tool
-    %
-    \begin{itemize}
-      \item these constraints should be adequately justified by political / economic / administrative reasons\ldots{}
-      \item \ldots{} otherwise, implementation choices should emerge \emph{as  a consequence of} design
-    \end{itemize}
-  \end{itemize}
-
-  \item If there are domain-specific terms, these should be explained in a glossary
-  
-  \item Each requirement must have its own \textbf{acceptance criterion}
-  %
-  \begin{itemize}
-    \item these will be important for the validation phase
-  \end{itemize}
+\textbf{Non-functional requirements}
+\begin{itemize}
+  \item Understandable implementation (clear modular structure; small components).
+  \item Reproducible deployment (Docker + Docker Compose).
+  \item Possibility for debugging (logging + a state endpoint).
+  \item Unit tests for local logic, integration tests for multi-node behavior.
 \end{itemize}
 
 \subsection{Relevant Distributed System Features}
-\label{ds-features}
-
-Motivate which distributed system features are relevant for your project, and which are not.
-%
 \begin{itemize}
-  \item transparency
-  \begin{itemize}
-    \item does your system need to hide distribution details from users or developers?
-    \item is it important that failures, location, or replication are invisible?
-  \end{itemize}
-
-  \item fault tolerance, dependability -- availability, reliability, integrity, maintainability, safety
-  \begin{itemize}
-    \item what happens if a component fails? is uninterrupted service required?
-    \item is data loss or corruption unacceptable?
-    \item how quickly must the system recover from faults?
-  \end{itemize}
-
-  \item scalability
-  \begin{itemize}
-    \item will the system need to handle increasing numbers of users, requests, or data?
-    \item is it expected to grow over time?
-  \end{itemize}
-
-  \item security, trust
-  \begin{itemize}
-    \item is sensitive data being processed or stored?
-    \item are there multiple user roles with different permissions?
-    \item is authentication or authorization required?
-  \end{itemize}
-
-  \item resource sharing
-  \begin{itemize}
-    \item do multiple users or components need access to shared resources?
-    \item is coordination or synchronization needed?
-  \end{itemize}
-
-  \item openness, interoperability, heterogeneity of components
-  \begin{itemize}
-    \item Will your system interact with external systems or use components built with different technologies?
-    \item Is standardization or compatibility important?
-  \end{itemize}
-
-  \item evolvability, maintainability
-  \begin{itemize}
-    \item Will the system need to be updated or extended after deployment?
-    \item Is long-term maintenance a concern?
-  \end{itemize}
-
-  \item performance, concurrency, computation / communication efficiency, bandwidth
-  \begin{itemize}
-    \item Are there strict requirements on response time or throughput?
-    \item Will many operations happen in parallel?
-    \item Is network usage a concern?
-  \end{itemize}
-
-  \item economy, costs  
-  \begin{itemize}
-    \item Are there budget constraints for development, deployment, or operation?
-    \item Is minimizing resource usage important?
-  \end{itemize}
+  \item \textbf{Distribution and scalability:} partitioning via consistent hashing.
+  \item \textbf{Fault tolerance:} replication and continued operation when a node fails.
+  \item \textbf{Consistency trade-offs:} quorum reads/writes with tunable parameters $R/W/Q$.
+  \item \textbf{Partial failures:} timeouts, node unavailability, and retry behavior.
+  \item \textbf{Membership:} detection of node liveness via heartbeats.
+  \item \textbf{Reconfiguration:} rebalancing data when nodes join or leave.
 \end{itemize}
 
 \section{Design}\label{design}
 
-This chapter explains the strategies used to meet the requirements identified in the analysis. 
-%
-Ideally, the design should be the same, regardless of the technological choices made during the implementation phase.
-
-\begin{quote}
-You can re-arrange the sections as you prefer, but all the sections must be present in the end
-\end{quote}
-
-\noindent
-\textbf{Important:} try to motivate your design choices in relation to the requirements and features identified 
-in \cref{requirements} and \cref{ds-features}.
-
 \subsection{Architecture}\label{architecture}
+The system uses a \textbf{peer-to-peer cluster} where each node offers both public client endpoints and internal replica/membership endpoints. A client may send requests to any node; the receiving node acts as a \textbf{coordinator} for that request, computing the responsible replicas using the current hash ring and then contacting replicas to satisfy the requested quorum.
 
+Nodes expose:
 \begin{itemize}
-  \item Which architectural style?
-  %
-  \begin{itemize}
-    \item why?
-  \end{itemize}
+  \item \textbf{Client API:} \texttt{/kv/put}, \texttt{/kv/get}, \texttt{/kv/delete}.
+  \item \textbf{Internal replica API:} replica \texttt{put/get/delete} endpoints used for replication.
+  \item \textbf{Debug/state API:} \texttt{/debug/state} for ring/membership visibility.
+  \item \textbf{Membership API:} \texttt{/internal/heartbeat}.
 \end{itemize}
 
 \subsection{Infrastructure}\label{infrastructure}
-
-\begin{itemize}
-  \item are there \emph{infrastructural components} that need to be introduced? \emph{how many}?
-  %
-  \begin{itemize}
-    \item e.g.~\emph{clients}, \emph{servers}, \emph{load balancers},
-    \emph{caches}, \emph{databases}, \emph{message brokers},
-    \emph{queues}, \emph{workers}, \emph{proxies}, \emph{firewalls},
-    \emph{CDNs}, \emph{etc.}
-  \end{itemize}
-
-  \item how do components \emph{distribute} over the network? \emph{where}?
-  %
-  \begin{itemize}
-    \item e.g.~do servers / brokers / databases / etc. sit on the same
-    machine? on the same network? on the same datacenter? on the same
-    continent?
-  \end{itemize}
-
-  \item how do components \emph{find} each other?
-  %
-  \begin{itemize}
-    \item how to \emph{name} components?
-    \item e.g.~DNS, \emph{service discovery}, \emph{load balancing},
-    \emph{etc.}
-  \end{itemize}
-\end{itemize}
-
-\begin{quote}
-Component diagrams are welcome here
-\end{quote}
+Nodes run as separate processes (or containers) and communicate over HTTP. Deployment uses Docker Compose to launch multiple nodes and the UI service on a shared virtual network. Ports are mapped to the host for easy access.
 
 \subsection{Modelling}\label{modelling}
-
+\textbf{Record model.} Each key maps to a record containing:
 \begin{itemize}
-  \item which \textbf{domain entities} are there?
-  %
-  \begin{itemize}
-    \item e.g.~\emph{users}, \emph{products}, \emph{orders}, \emph{etc.}
-  \end{itemize}
-  
-  \item how do \emph{domain entities} \textbf{map to} \emph{infrastructural components}?
-  %
-  \begin{itemize}
-    \item e.g.~state of a video game on central server, while inputs/representations on clients
-    \item e.g.~where to store messages in an IM app? for how long?
-  \end{itemize}
-
-  \item which \textbf{domain events} are there?
-  %
-  \begin{itemize}
-    \item e.g.~\emph{user registered}, \emph{product added to cart}, \emph{order placed}, \emph{etc.}
-  \end{itemize}
-  
-  \item which sorts of \textbf{messages} are exchanged?
-  %
-  \begin{itemize}
-    \item e.g.~\emph{commands}, \emph{events}, \emph{queries}, \emph{etc.}
-  \end{itemize}
-
-  \item what information does the \textbf{state} of the system comprehend
-  %
-  \begin{itemize}
-    \item e.g.~\emph{users' data}, \emph{products' data}, \emph{orders' data}, \emph{etc.}
-  \end{itemize}
+  \item \texttt{value}: optional string (absent for tombstones),
+  \item \texttt{ts}: a floating-point timestamp,
+  \item \texttt{tombstone}: boolean deletion marker.
 \end{itemize}
 
-\begin{quote}
-Class diagram are welcome here
-\end{quote}
+\textbf{Conflict model.} The system uses \textbf{last-write-wins (LWW)}: the record with the greatest timestamp is considered true.
 
 \subsection{Interaction}\label{interaction}
-
-\begin{itemize}
-  \item how do components \emph{communicate}? \emph{when}? \emph{what}?
-  \item \emph{which} \textbf{interaction patterns} do they enact?
-\end{itemize}
-
-\begin{quote}
-Sequence diagrams are welcome here
-\end{quote}
+\textbf{Write path (PUT).} A coordinator determines the replica set for the key (size $R$) and sends internal replica writes to those nodes. The operation is acknowledged to the client once $W$ replicas confirm.
+\textbf{Read path (GET).} A coordinator queries replicas and waits for $Q$ responses, then returns the newest record via LWW.
+\textbf{Delete path (DELETE).} A coordinator replicates a tombstone record with a timestamp and waits for $W$ acknowledgments.
 
 \subsection{Behaviour}\label{behaviour}
-
+The system behaves correctly under the following normal and failure scenarios:
 \begin{itemize}
-  \item how does \emph{each} component \textbf{behave} individually (e.g.~in \emph{response} to \emph{events} or messages)?
-  \begin{itemize}
-    \item some components may be \emph{stateful}, others \emph{stateless}
-  \end{itemize}
-
-  \item which components are in charge of updating the \textbf{state} of the system? \emph{when}? \emph{how}?
+  \item With no failures, reads and writes succeed and distribute load across nodes.
+  \item If one node fails, operations still succeed.
+  \item When a node joins or leaves, the membership changes update the ring; rebalancing transfers keys to new responsible replicas.
 \end{itemize}
-
-\begin{quote}
-State diagrams are welcome here
-\end{quote}
 
 \subsection{Data and Consistency Issues}\label{data-and-consistency-issues}
-
-\begin{itemize}
-  \item Is there any data that needs to be stored?
-  %
-  \begin{itemize}
-    \item \emph{what} data? \emph{where}? \emph{why}?
-  \end{itemize}
-  
-  \item how should \emph{persistent data} be \textbf{stored}?
-  %
-  \begin{itemize}
-    \item e.g.~relations, documents, key-value, graph, etc.
-    \item why?
-  \end{itemize}
-  
-  \item Which components perform queries on the database?
-  %
-  \begin{itemize}
-    \item \emph{when}? \emph{which} queries? \emph{why}?
-    \item concurrent read? concurrent write? why?
-  \end{itemize}
-  
-  \item Is there any data that needs to be shared between components?
-  %
-  \begin{itemize}
-    \item \emph{why}? \emph{what} data?
-  \end{itemize}
-\end{itemize}
+Mini-Dynamo targets \textbf{eventual consistency}. With appropriate quorum choices, the probability of serving stale reads is reduced. Timestamps implement a simple conflict resolution scheme.
+A key observation during development was that weak write quorums (e.g., $W=1$ with $R=2$) can lead to data loss under a single-node failure if the only acknowledged replica fails.
 
 \subsection{Fault-Tolerance}\label{fault-tolerance}
-
+Fault tolerance is achieved through replication and failure detection:
 \begin{itemize}
-  \item Is there any form of data \textbf{replication} / federation / sharing?
-  %
-  \begin{itemize}
-    \item \emph{why}? \emph{how} does it work?
-  \end{itemize}
-  
-  \item Is there any \textbf{heart-beating}, \textbf{timeout}, \textbf{retry mechanism}?
-  %
-  \begin{itemize}
-    \item \emph{why}? \emph{among} which components? \emph{how} does it work?
-  \end{itemize}
-  
-  \item Is there any form of \textbf{error handling}?
-  %
-  \begin{itemize}
-    \item \emph{what} happens when a component fails? \emph{why}? \emph{how}?
-  \end{itemize}
+  \item \textbf{Replication:} data is stored on $R$ distinct nodes.
+  \item \textbf{Failure detection:} heartbeats mark peers as unavailable after a timeout.
+  \item \textbf{Adaptive routing:} unavailable peers are excluded from the active ring.
+  \item \textbf{Rebalancing:} when membership changes, nodes push locally stored keys toward the current replica set.
 \end{itemize}
 
 \subsection{Availability}\label{availability}
-
-\begin{itemize}
-  \item Is there any \textbf{caching} mechanism?
-  %
-  \begin{itemize}
-    \item \emph{where}? \emph{why}?
-  \end{itemize}
-  
-  \item Is there any form of \textbf{load balancing}?
-  %
-  \begin{itemize}
-    \item \emph{where}? \emph{why}?
-  \end{itemize}
-
-  \item In case of \textbf{network partitioning}, how does the system behave?
-  %
-  \begin{itemize}
-    \item \emph{why}? \emph{how}?
-  \end{itemize}
-\end{itemize}
+Availability depends on quorum configuration and the number of live replicas. The system can be configured to favor availability (small $W$ and $Q$) or stronger consistency/durability (larger $W$ and $Q$).
 
 \subsection{Security}\label{security}
-
-\begin{itemize}
-  \item Is there any form of \textbf{authentication}?
-  %
-  \begin{itemize}
-    \item \emph{where}? \emph{why}?
-  \end{itemize}
-
-  \item Is there any form of \textbf{authorization}?
-  %
-  \begin{itemize}
-    \item which sort of \emph{access control}?
-    \item which sorts of users / \emph{roles}? which \emph{access rights}?
-  \end{itemize}
-
-  \item Are \textbf{cryptographic schemas} being used?
-  %
-  \begin{itemize}
-    \item e.g.~token verification,
-    \item e.g.~data encryption, etc.
-  \end{itemize}
-\end{itemize}
+Security was not a primary focus for this prototype. The system assumes a trusted network environment (e.g., Docker Compose network) and does not implement authentication, authorization, TLS, or input hardening beyond basic validation. These could be added as future work.
 
 \section{Implementation}\label{implementation}
 
-Please report here all the implementation (technology-dependent) choices you made while implementing your design.
-
-\begin{quote}
-  If you run out of time for this project, you may consider leaving some aspect unimplemented, 
-  and simply discuss how you would have implemented them.
-  %
-  In this case, better would be to discuss unimplemented features in \cref{future-works}.
-\end{quote}
-
-\begin{itemize}
-  \item which \textbf{network protocols} to use?
-  %
-  \begin{itemize}
-    \item e.g.~UDP, TCP, HTTP, WebSockets, gRPC, XMPP, AMQP, MQTT, etc.
-  \end{itemize}
-  
-  \item how should \emph{in-transit data} be \textbf{represented}?
-  %
-  \begin{itemize}
-    \item e.g.~JSON, XML, YAML, Protocol Buffers, etc.
-  \end{itemize}
-  
-  \item how should \emph{databases} be \textbf{queried}?
-  %
-  \begin{itemize}
-    \item e.g.~SQL, NoSQL, etc.
-  \end{itemize}
-  
-  \item how should components be \emph{authenticated}?
-  %
-  \begin{itemize}
-    \item e.g.~OAuth, JWT, etc.
-  \end{itemize}
-
-  \item how should components be \emph{authorized}?
-  %
-  \begin{itemize}
-    \item e.g.~RBAC, ABAC, etc.
-  \end{itemize}
-\end{itemize}
-
 \subsection{Technological details}\label{technological-details}
-
 \begin{itemize}
-  \item any particular \emph{framework} / \emph{technology} being exploited goes here
+  \item \textbf{Language:} Python.
+  \item \textbf{Web framework:} FastAPI for node APIs and the demo UI.
+  \item \textbf{Inter-node/client requests:} \texttt{httpx} (async HTTP client).
+  \item \textbf{Concurrency:} \texttt{asyncio} for concurrent requests and background tasks (heartbeats).
+  \item \textbf{Deployment:} Docker and Docker Compose.
+  \item \textbf{Testing:} \texttt{pytest} for unit tests (hashing/store logic) and integration tests (multi-node behavior).
 \end{itemize}
+
+The codebase is organized into modules (hashing, membership, quorum logic, storage, node API, and UI) to keep the implementation navigable and to support easy debugging.
 
 \section{Validation}\label{validation}
 
 \subsection{Automatic Testing}\label{automatic-testing}
-
+Automatic tests were implemented at two levels:
 \begin{itemize}
-  \item how were individual components \textbf{\emph{unit}-test}ed?
-  
-  \item how was communication, interaction, and/or integration among components tested?
-  
-  \item how to \textbf{\emph{end-to-end}-test} the system?
-  %
-  \begin{itemize}
-    \item e.g.~production vs.~test environment
-  \end{itemize}
-
-  \item for each test specify:
-  %
-  \begin{itemize}
-    \item rationale of individual tests
-    \item how were the test automated
-    \item how to run them
-    \item which requirement they are testing, if any
-  \end{itemize}
+  \item \textbf{Unit tests:} validate consistent hashing properties (stable ownership, unique replicas) and storage semantics (LWW conflict resolution, tombstones).
+  \item \textbf{Integration tests:} spawn multiple node processes and verify end-to-end PUT/GET behavior, including operation success when a node is stopped (under suitable quorum settings).
 \end{itemize}
-
-\begin{quote}
-recall that \emph{deployment} \textbf{automation} is commonly used to \emph{test} the system in \emph{production-like} environment
-\end{quote}
-
-\begin{quote}
-recall to test corner cases (crashes, errors, etc.)
-\end{quote}
 
 \subsection{Acceptance test}\label{acceptance-test}
-
-\begin{itemize}
-  \item did you perform any \emph{manual} testing?
-  %
-  \begin{itemize}
-    \item what did you test?
-    \item why wasn't it automatic?
-  \end{itemize}
-\end{itemize}
+A manual acceptance test is performed using the web UI:
+\begin{enumerate}
+  \item Start a 3-node cluster (Docker Compose).
+  \item Use the UI to PUT a key and then GET it from the cluster.
+  \item Stop one node and repeat GET/PUT operations to demonstrate fault tolerance.
+  \item Restart the node (or add/remove a node) and observe membership updates and rebalancing behavior via the node state panel.
+\end{enumerate}
 
 \section{Deployment}\label{deployment}
-
-\begin{itemize}
-  \item should one install your software from scratch, how to do it?
-  %
-  \begin{itemize}
-    \item provide instructions
-    \item provide expected outcomes
-  \end{itemize}
-
-  \item what software should be installed on the machines to run your project? which versions?
-  
-  \item should one set environment variables or configuration files?
-  
-  \item if you're using containerization (e.g.~Docker), 
-  describe how you engineered your deployment scrips (e.g. \texttt{docker-compose.yml} files)
-\end{itemize}
+Deployment is provided via Docker and Docker Compose. A single Docker image is built for the project, and Compose runs multiple node services plus the UI service. This enables reproducible demonstrations on any machine with Docker installed.
 
 \section{User Guide}\label{user-guide}
-
-\begin{itemize}
-  \item how to use your software?
-  %
-  \begin{itemize}
-    \item provide instructions
-    \item provide expected outcomes
-    \item provide screenshots if possible
-  \end{itemize}
-\end{itemize}
+\textbf{Local run (without Docker).} Start three nodes in separate terminals using \texttt{python run\_node.py} with different ports and peer lists, then start the UI using \texttt{python run\_ui.py}.
+\textbf{Docker run.} From the project root:
+\begin{verbatim}
+  docker compose up --build
+\end{verbatim}
+Open the UI at \texttt{http://127.0.0.1:9000}. The UI supports PUT/GET/DELETE and shows a simplified view of the node state (active ring, alive/dead peers, and $R/W/Q$ configuration).
 
 \section{Self-evaluation}\label{self-evaluation}
-
-\begin{itemize}
-  \item An individual section is required for each member of the group
-  \item Each member must self-evaluate their work, listing the strengths and weaknesses of the product
-  \item Each member must describe their role within the group as objectively as possible.
-\end{itemize}
-
-It should be noted that each student is only responsible for their own section.
+This project met the main learning objectives: implementing a realistic data-partitioning scheme, adding replication, exploring quorum-based trade-offs, and handling partial failures via timeouts and membership updates. The most instructive aspect was observing how configuration choices (especially $W$) affect durability under failures and how membership changes require rebalancing to avoid apparent data loss.
 
 \section{Future works}\label{future-works}
-
-Discuss possible future works, improvements, extensions, optimizations, etc.
-
-Also discuss here any unimplemented feature, and how you would have implemented it.
+Possible extensions include:
+\begin{itemize}
+  \item \textbf{Persistence:} store records permanently (e.g., SQLite or append-only log) to survive full restarts.
+  \item \textbf{Read repair:} after a read, push the newest record to stale replicas.
+  \item \textbf{Hinted handoff:} temporarily store writes for unavailable nodes and forward them upon recovery.
+  \item \textbf{Gossip membership:} replace centralized peer lists/heartbeats with gossip dissemination.
+  \item \textbf{Metrics and monitoring:} request counters and latency histograms, plus a small dashboard.
+  \item \textbf{Security:} authentication, TLS, and input hardening for untrusted networks.
+\end{itemize}
 
 \bibliographystyle{plain}
 \bibliography{references}
