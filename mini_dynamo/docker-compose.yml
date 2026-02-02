@@ -1,0 +1,60 @@
+services:
+  node1:
+    build: .
+    command: >
+      python run_node.py
+      --node-id n1
+      --host 0.0.0.0
+      --port 8001
+      --peers http://node2:8002,http://node3:8003
+      --replication 3
+      --w 2
+      --q 2
+      --debug
+    ports:
+      - "8001:8001"
+
+  node2:
+    build: .
+    command: >
+      python run_node.py
+      --node-id n2
+      --host 0.0.0.0
+      --port 8002
+      --peers http://node1:8001,http://node3:8003
+      --replication 3
+      --w 2
+      --q 2
+      --debug
+    ports:
+      - "8002:8002"
+
+  node3:
+    build: .
+    command: >
+      python run_node.py
+      --node-id n3
+      --host 0.0.0.0
+      --port 8003
+      --peers http://node1:8001,http://node2:8002
+      --replication 3
+      --w 2
+      --q 2
+      --debug
+    ports:
+      - "8003:8003"
+
+  ui:
+    build: .
+    command: >
+      python run_ui.py
+      --host 0.0.0.0
+      --port 9000
+      --target http://node1:8001
+      --debug
+    ports:
+      - "9000:9000"
+    depends_on:
+      - node1
+      - node2
+      - node3
