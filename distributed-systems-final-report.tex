@@ -5,6 +5,7 @@
 \usepackage{natbib}
 \usepackage{graphicx}
 \usepackage{cleveref}
+\usepackage{placeins}
 
 \newcommand{\emailaddr}[1]{\href{mailto:#1}{\texttt{#1}}}
 
@@ -36,7 +37,6 @@ This project delivers a \textbf{distributed key--value store} (a software servic
       \item Replication to $R$ distinct nodes.
       \item Quorum reads/writes via parameters $W$ and $Q$.
       \item Membership and failure detection via heartbeats.
-      \item Rebalancing (key handoff) on membership changes.
       \item Web UI for demo and observability (human-readable summaries + raw JSON).
     \end{itemize}
 \end{itemize}
@@ -50,7 +50,7 @@ This project delivers a \textbf{distributed key--value store} (a software servic
   \item Partition keys across nodes using consistent hashing.
   \item Replicate records to multiple nodes and support quorum-based reads/writes.
   \item Detect failed peers and adapt routing to any available nodes.
-  \item Support changes when new node joins or leaves without requiring a full restart.
+  \item Support changes when a known node becomes unreachable without requiring a full restart.
   \item Provide a simple user interface for demonstration.
 \end{itemize}
 
@@ -59,7 +59,7 @@ This project delivers a \textbf{distributed key--value store} (a software servic
   \item Understandable implementation (clear modular structure; small components).
   \item Reproducible deployment (Docker + Docker Compose).
   \item Possibility for debugging (logging + a state endpoint).
-  \item Unit tests for local logic, integration tests for multi-node behavior.
+  \item Unit tests for local logic, manual tests for multi-node behavior.
 \end{itemize}
 
 \subsection{Relevant Distributed System Features}
@@ -69,14 +69,13 @@ This project delivers a \textbf{distributed key--value store} (a software servic
   \item \textbf{Consistency trade-offs:} quorum reads/writes with tunable parameters $R/W/Q$.
   \item \textbf{Partial failures:} timeouts, node unavailability, and retry behavior.
   \item \textbf{Membership:} detection of node liveness via heartbeats.
-  \item \textbf{Reconfiguration:} rebalancing data when nodes join or leave.
 \end{itemize}
 
 \section{Design}\label{design}
 
 \subsection{Architecture}\label{architecture}
-The system uses a \textbf{peer-to-peer cluster} where each node offers both public client endpoints and internal replica/membership endpoints. A client may send requests to any node; the receiving node acts as a \textbf{coordinator} for that request, computing the responsible replicas using the current hash ring and then contacting replicas to satisfy the requested quorum.
-
+The system uses a \textbf{peer-to-peer cluster} where each node offers both public client endpoints and internal replica/membership endpoints. A client may send requests to any node; the receiving node acts as a \textbf{coordinator} for that request, computing the responsible replicas using the current hash ring and then contacting replicas to satisfy the requested quorum. This is done to avoid one permanent central coordinator.
+\\
 Nodes expose:
 \begin{itemize}
   \item \textbf{Client API:} \texttt{/kv/put}, \texttt{/kv/get}, \texttt{/kv/delete}.
@@ -85,6 +84,13 @@ Nodes expose:
   \item \textbf{Membership API:} \texttt{/internal/heartbeat}.
 \end{itemize}
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\textwidth]{figures/architecture.png}
+    \caption{Simple architecture of Mini-Dynamo. A client can send a request to any node, and the receiving node acts as coordinator for that request.}
+    \label{fig:architecture}
+\end{figure}
+\FloatBarrier
 \subsection{Infrastructure}\label{infrastructure}
 Nodes run as separate processes (or containers) and communicate over HTTP. Deployment uses Docker Compose to launch multiple nodes and the UI service on a shared virtual network. Ports are mapped to the host for easy access.
 
@@ -96,19 +102,32 @@ Nodes run as separate processes (or containers) and communicate over HTTP. Deplo
   \item \texttt{tombstone}: boolean deletion marker.
 \end{itemize}
 
-\textbf{Conflict model.} The system uses \textbf{last-write-wins (LWW)}: the record with the greatest timestamp is considered true.
+\textbf{Conflict model.} The system uses \textbf{last-write-wins (LWW)}: the record with the greatest timestamp is considered true. This was implemented due to it's simplicity.
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/hash_ring.png}
+    \caption{Example of key placement in the consistent hashing ring. The position hash(key) is mapped onto the ring, and the first node encountered clockwise becomes the primary owner. The following clockwise nodes are selected as replicas.}
+    \label{fig:hash-ring}
+\end{figure}
+\FloatBarrier
 \subsection{Interaction}\label{interaction}
-\textbf{Write path (PUT).} A coordinator determines the replica set for the key (size $R$) and sends internal replica writes to those nodes. The operation is acknowledged to the client once $W$ replicas confirm.
-\textbf{Read path (GET).} A coordinator queries replicas and waits for $Q$ responses, then returns the newest record via LWW.
+\textbf{Write path (PUT).} A coordinator determines the replica set for the key (size $R$) and sends internal replica writes to those nodes. The operation is acknowledged to the client once $W$ replicas confirm.\\
+\textbf{Read path (GET).} A coordinator queries replicas and waits for $Q$ responses, then returns the newest record via LWW.\\
 \textbf{Delete path (DELETE).} A coordinator replicates a tombstone record with a timestamp and waits for $W$ acknowledgments.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\textwidth]{figures/put_request.png}
+    \caption{Sequence diagram for a PUT operation. The coordinator receives the client request, forwards replica writes, waits for acknowledgments, and then returns success.}
+    \label{fig:put-sequence}
+\end{figure}
 
+\FloatBarrier
 \subsection{Behaviour}\label{behaviour}
 The system behaves correctly under the following normal and failure scenarios:
 \begin{itemize}
   \item With no failures, reads and writes succeed and distribute load across nodes.
-  \item If one node fails, operations still succeed.
-  \item When a node joins or leaves, the membership changes update the ring; rebalancing transfers keys to new responsible replicas.
+  \item If one node fails, the operations still succeed. This only happens if the required quorum can be satisfied by the remaining live replicas.
 \end{itemize}
 
 \subsection{Data and Consistency Issues}\label{data-and-consistency-issues}
@@ -121,7 +140,6 @@ Fault tolerance is achieved through replication and failure detection:
   \item \textbf{Replication:} data is stored on $R$ distinct nodes.
   \item \textbf{Failure detection:} heartbeats mark peers as unavailable after a timeout.
   \item \textbf{Adaptive routing:} unavailable peers are excluded from the active ring.
-  \item \textbf{Rebalancing:} when membership changes, nodes push locally stored keys toward the current replica set.
 \end{itemize}
 
 \subsection{Availability}\label{availability}
@@ -139,7 +157,7 @@ Security was not a primary focus for this prototype. The system assumes a truste
   \item \textbf{Inter-node/client requests:} \texttt{httpx} (async HTTP client).
   \item \textbf{Concurrency:} \texttt{asyncio} for concurrent requests and background tasks (heartbeats).
   \item \textbf{Deployment:} Docker and Docker Compose.
-  \item \textbf{Testing:} \texttt{pytest} for unit tests (hashing/store logic) and integration tests (multi-node behavior).
+  \item \textbf{Testing:} \texttt{pytest} for unit tests (hashing/store logic) and manual tests for multi-node behavior.
 \end{itemize}
 
 The codebase is organized into modules (hashing, membership, quorum logic, storage, node API, and UI) to keep the implementation navigable and to support easy debugging.
@@ -147,10 +165,10 @@ The codebase is organized into modules (hashing, membership, quorum logic, stora
 \section{Validation}\label{validation}
 
 \subsection{Automatic Testing}\label{automatic-testing}
-Automatic tests were implemented at two levels:
+Two automatic tests were implemented:
 \begin{itemize}
-  \item \textbf{Unit tests:} validate consistent hashing properties (stable ownership, unique replicas) and storage semantics (LWW conflict resolution, tombstones).
-  \item \textbf{Integration tests:} spawn multiple node processes and verify end-to-end PUT/GET behavior, including operation success when a node is stopped (under suitable quorum settings).
+  \item \textbf{Hashing tests:} validate consistent hashing properties (stable ownership, unique replicas).
+  \item \textbf{Storage tests:} validation of storage semantics (LWW conflict resolution, tombstones).
 \end{itemize}
 
 \subsection{Acceptance test}\label{acceptance-test}
@@ -159,7 +177,6 @@ A manual acceptance test is performed using the web UI:
   \item Start a 3-node cluster (Docker Compose).
   \item Use the UI to PUT a key and then GET it from the cluster.
   \item Stop one node and repeat GET/PUT operations to demonstrate fault tolerance.
-  \item Restart the node (or add/remove a node) and observe membership updates and rebalancing behavior via the node state panel.
 \end{enumerate}
 
 \section{Deployment}\label{deployment}
@@ -174,7 +191,7 @@ Deployment is provided via Docker and Docker Compose. A single Docker image is b
 Open the UI at \texttt{http://127.0.0.1:9000}. The UI supports PUT/GET/DELETE and shows a simplified view of the node state (active ring, alive/dead peers, and $R/W/Q$ configuration).
 
 \section{Self-evaluation}\label{self-evaluation}
-This project met the main learning objectives: implementing a realistic data-partitioning scheme, adding replication, exploring quorum-based trade-offs, and handling partial failures via timeouts and membership updates. The most instructive aspect was observing how configuration choices (especially $W$) affect durability under failures and how membership changes require rebalancing to avoid apparent data loss.
+This project met the main learning objectives: implementing a realistic data-partitioning scheme, adding replication, exploring quorum-based trade-offs, and handling partial failures via timeouts and membership updates. The most instructive aspect was observing how configuration choices (especially $W$) affect durability under failures.
 
 \section{Future works}\label{future-works}
 Possible extensions include:
@@ -183,11 +200,10 @@ Possible extensions include:
   \item \textbf{Read repair:} after a read, push the newest record to stale replicas.
   \item \textbf{Hinted handoff:} temporarily store writes for unavailable nodes and forward them upon recovery.
   \item \textbf{Gossip membership:} replace centralized peer lists/heartbeats with gossip dissemination.
-  \item \textbf{Metrics and monitoring:} request counters and latency histograms, plus a small dashboard.
+  \item \textbf{Rebalancing:} when a new node joins or leaves, an automatic key redistribution would occur to ensure no data loss.
   \item \textbf{Security:} authentication, TLS, and input hardening for untrusted networks.
 \end{itemize}
 
 \bibliographystyle{plain}
-\bibliography{references}
 
 \end{document}
